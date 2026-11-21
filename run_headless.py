@@ -6,6 +6,8 @@ def main():
            [str(root/'.venv/Scripts/python.exe'),str(pathlib.Path('windows_ci_e2e.py').resolve())]]
     for index,step in enumerate(steps):
         result=subprocess.run(step,cwd=root,capture_output=True,text=True,encoding='utf-8',errors='replace')
+        for line in result.stdout.splitlines():
+            if line in {'KLP_STAGE=raw','KLP_STAGE=asr','KLP_STAGE=render','KLP_STAGE=edit','KLP_STAGE=qc'}:print(line)
         if result.returncode:
             print('HEADLESS_STEP_FAILED='+str(index));sys.exit(1)
         for line in result.stdout.splitlines():
