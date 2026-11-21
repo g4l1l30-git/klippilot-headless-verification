@@ -33,6 +33,7 @@ def main():
               f"$voice.SetOutputToWaveFile('{str(audio).replace(chr(39), chr(39)*2)}'); "
               "$voice.Speak('This video tests an editable storyboard. "
               "The software should preserve this original recording.'); $voice.Dispose()")
+    print('KLP_STAGE=raw',flush=True)
     run('powershell', '-NoProfile', '-Command', script)
     source = fixture/'raw.mp4'
     run('ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i',
@@ -40,21 +41,26 @@ def main():
         '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', source)
     original = digest(source)
     project = root/'ci-project'
+    print('KLP_STAGE=asr',flush=True)
     run(sys.executable, 'engine.py', 'plan', source, project, '--language', 'en')
     plan = json.loads((project/'plan.json').read_text(encoding='utf-8'))
     if not plan['clips'] or not any(c['text'].strip() for c in plan['clips']):
         raise AssertionError('ASR did not produce an editable plan')
     if not (project/'storyboard.html').is_file():
         raise AssertionError('Storyboard missing')
+    print('KLP_STAGE=render',flush=True)
     run(sys.executable, 'engine.py', 'render', project)
     before = digest(project/'result.mp4')
+    print('KLP_STAGE=edit',flush=True)
     run(sys.executable, 'engine.py', 'edit', project,
         'Use darker lighting and stronger captions. Make the framing wider.')
+    print('KLP_STAGE=render',flush=True)
     run(sys.executable, 'engine.py', 'render', project)
     after = digest(project/'result.mp4')
     qc = json.loads((project/'qc.json').read_text())
     if before == after or digest(source) != original or qc['decode'] != 'pass':
         raise AssertionError('Render change, source preservation or QC failed')
+    print('KLP_STAGE=qc',flush=True)
     report = dict(test='fresh-hosted-Windows-headless', gui_tested=False,
                   private_footage_uploaded=False, asr_clips=len(plan['clips']),
                   original_sha256=original, before_sha256=before,
